@@ -1,154 +1,205 @@
-# ROS 2 Jazzy + Gazebo Harmonic + MuJoCo + CUDA/GPU Docker
+# ROS 2 Jazzy + Gazebo Harmonic + MuJoCo (CPU / macOS Intel Setup)
 
-This is your course-provided container: Ubuntu 24.04 with ROS 2 Jazzy,
-Gazebo Harmonic, MuJoCo (Python), NVIDIA GPU access, and GUI support (for
-`rviz2`, `gz sim`, etc.) already set up. You shouldn't need to install any
-of this yourself — just build and run the container below.
+A Docker-based development environment for **ROS 2 Jazzy Jalisco**, **Gazebo Harmonic**, and **MuJoCo 3.x** optimized for macOS on Intel processors (`x86_64`).
 
-## Prerequisites (one-time, on your machine)
+This environment uses **noVNC + Xvfb** to render 3D graphics (RViz2, Gazebo, MuJoCo Viewer) via Mesa software rendering (`llvmpipe`), allowing you to view and interact with GUI applications directly from your web browser without depending on XQuartz or an Nvidia GPU.
 
-1. Docker + Docker Compose v2 installed (from [this link](https://docs.docker.com/engine/install/)).
-2. Your NVIDIA driver installed (should already be the case, but check [this](https://docs.nvidia.com/cuda/cuda-quick-start-guide/index.html)).
-3. **NVIDIA Container Toolkit** installed and configured — this is what
-   lets the container use your GPU:
-   ```bash
-   sudo apt-get install -y nvidia-container-toolkit
-   sudo nvidia-ctk runtime configure --runtime=docker
-   sudo systemctl restart docker
-   ```
+## 🛠️ Prerequisites
 
-## Files in this repo
+* **Docker Desktop for Mac** (Intel `x86_64`)
+* **Git**
+* A modern web browser (Safari, Chrome, Firefox)
 
-| File | Purpose |
-|---|---|
-| `Dockerfile` | Builds the image: CUDA base -> ROS 2 Jazzy -> Gazebo Harmonic -> MuJoCo -> GUI libs |
-| `docker-compose.yml` | How to *run* the image: GPU flag, X11 mount, workspace mount |
-| `entrypoint.sh` | Sources ROS 2 automatically every time the container starts |
-| `ros2_ws/src` | Your ROS 2 workspace source folder — put your packages here |
+## 🚀 Quick Start
 
-## Description
-
-**GPU access**: The `gpus: all` line in `docker-compose.yml` tells Docker
-to use the NVIDIA Container Toolkit runtime, which exposes your GPU
-driver and CUDA libraries inside the container. You do **not** install an
-NVIDIA driver inside the container — it always uses your host's driver.
-`NVIDIA_DRIVER_CAPABILITIES=all` additionally exposes the
-`graphics`/`display` capability, which is what lets OpenGL/GLX
-applications like `rviz2` and Gazebo actually render using the GPU
-instead of falling back to slow software rendering.
-
-**GUI windows (X11 forwarding)**: Linux GUI apps talk to an X11 display
-server. Rather than running an X server *inside* the container, we let
-the container talk to the X server already running on your desktop:
-- We mount `/tmp/.X11-unix` (the X11 socket) into the container.
-- We pass through the `DISPLAY` environment variable.
-- You tell your X server to accept connections from the container
-  (step 1 below) — this is the part people usually forget.
-
-## Running it
-
-### 0. Generate your `.env` (one-time, on your machine):
-Run this from the root of the repo (the folder containing
-`docker-compose.yml`):
-```bash
-echo "UID=$(id -u)" > .env
-echo "GID=$(id -g)" >> .env
+### 1. Clone the Repository
 ```
-This records your user and group IDs so files created in the container
-aren't owned by root on your machine. Your `.env` should contain just
-these two lines, for example (if your IDs are 1000):
+git clone <YOUR_REPOSITORY_URL>
+cd ros2-jazzy-gpu
 ```
-UID=1000
-GID=1000
-```
-Your numbers may differ, and that's fine — they should match whatever
-`id -u` and `id -g` print on your machine.
 
-### 1. One-time per login session:
-```bash
-xhost +local:docker
+### 2. Build and Start the Container
 ```
-This tells your X server to trust connections from local Docker
-containers. (Run this again if you reboot or log out/in.)
-
-### 2. Build and start the container:
-```bash
-docker compose up -d --build
+docker compose build
+docker compose up -d
 ```
-The first build takes a while (installing ROS 2, Gazebo, etc.) — grab a
-coffee. Later runs are fast since the image is already built.
 
-### 3. Get a shell inside it:
-```bash
+### 3. Open the GUI in Your Browser
+Navigate to the following URL in Safari or Chrome:
+> [**http://localhost:8080/vnc.html**](http://localhost:8080/vnc.html)
+
+Click the **Connect** button. You will see a virtual desktop running the Openbox window manager.
+
+### 4. Attach to the Container Terminal
+Open a terminal on your Mac and run:
+```
 docker compose exec ros2 bash
 ```
-ROS 2 is sourced automatically in every new shell, so you don't need to
-run `source /opt/ros/jazzy/setup.bash` yourself.
 
-### 4. Sanity checks — run these once to confirm everything works:
-```bash
-# GPU visible?
-nvidia-smi
+---
 
-# OpenGL / GUI rendering working? A spinning gear window should pop up.
-glxgears
+## 🛠 Container Installations & Setup Details
 
-# ROS 2 working?
-ros2 topic list
+The container image includes all packages and dependencies required to support software rendering and simulation:
 
-# rviz2 opens a window?
+### Installed Packages Summary
+
+1. **Base System & Tools:**
+   * `ubuntu:24.04` (Noble Numbat)
+   * `curl`, `gnupg2`, `lsb-release`, `build-essential`, `git`, `python3-pip`, `python3-venv`
+
+2. **ROS 2 & Gazebo Stack:**
+   * `ros-jazzy-desktop`
+   * `ros-dev-tools`
+   * `python3-colcon-common-extensions`
+   * `gz-harmonic` (Gazebo Sim 8)
+   * `ros-jazzy-ros-gz` (`ros_gz_bridge`)
+
+3. **Virtual Framebuffer & Web GUI Stack:**
+   * `xvfb` (X Virtual Framebuffer)
+   * `openbox` (Lightweight window manager)
+   * `x11vnc` (VNC server)
+   * `novnc` & `python3-websockify` (Web browser access)
+
+4. **Graphics Engine & Benchmarks:**
+   * `mesa-utils`, `mesa-utils-bin`
+   * `libgl1-mesa-dri`, `libglx-mesa0`, `libegl1`, `libgles2`
+   * `x11-apps`
+   * `glmark2` & `glmark2-es2`
+
+5. **Physics & Simulation:**
+   * `mujoco` Python bindings (v3.x)
+
+---
+
+## 🌐 Environment Variables Configuration
+
+The following environment variables are set inside the container (and configured via `docker-compose.yml` / `entrypoint.sh`) to force software rendering and output GUI applications to the noVNC display server:
+
+| Variable | Value | Description |
+| :--- | :--- | :--- |
+| `DISPLAY` | `:99` | Connects applications to the Xvfb virtual display buffer. |
+| `LIBGL_ALWAYS_SOFTWARE` | `1` | Forces Mesa driver to use `llvmpipe` software rendering instead of hardware acceleration. |
+| `QT_X11_NO_MITSHM` | `1` | Disables Shared Memory extension in Qt to prevent graphics glitches over VNC. |
+| `MESA_GL_VERSION_OVERRIDE` | `4.5` | Exposes OpenGL 4.5 capabilities through software. |
+| `GALLIUM_DRIVER` | `llvmpipe` | Instructs the Mesa Gallium driver to use CPU-based rasterization. |
+
+---
+
+## 🧪 Verifying the Installation
+
+Inside the container terminal (`docker compose exec ros2 bash`), you can run the following sanity checks:
+
+### 1. RViz2 Test
+```
 rviz2
+```
+* **Expected Result:** RViz2 opens in your browser window (`http://localhost:8080/vnc.html`).
 
-# Gazebo Harmonic opens a window?
-gz sim -v4
+### 2. Gazebo Harmonic Test
+```
+gz sim -v 4 empty.sdf
+```
+* **Expected Result:** Gazebo Sim opens a 3D grid world inside the browser window.
 
-# MuJoCo installed?
-python3 -c "import mujoco; print(mujoco.__version__)"
+### 3. ROS 2 <-> Gazebo Bridge Test
+```
+ros2 run ros_gz_bridge parameter_bridge --help
+```
+* **Expected Result:** Displays topic bridging syntax options.
+
+### 4. MuJoCo Python Verification
+```
+python3 -c "import mujoco; print(f'MuJoCo version: {mujoco.__version__}')"
+```
+* **Expected Result:** Prints `MuJoCo version: 3.16.0` (or current 3.x release).
+
+### 5. OpenGL Benchmark
+```
+glmark2
+```
+* **Expected Result:** Runs 3D scene benchmarks in your browser using `llvmpipe`.
+
+---
+
+## 🧍 Running MuJoCo Simulations Without CPU Overload
+
+To run a MuJoCo simulation without saturating your Mac's CPU cores, use a Python script with frame-rate control rather than the unthrottled `python3 -m mujoco.viewer`.
+
+### Example Script (`test_view.py`)
+
+Place `test_view.py` inside your `./ros2_ws` directory on your Mac:
+
+```python
+import os
+import time
+import mujoco
+import mujoco.viewer
+
+# Path to your downloaded XML model
+model_path = os.path.expanduser('~/mujoco_models/humanoid.xml')
+
+model = mujoco.MjModel.from_xml_path(model_path)
+data = mujoco.MjData(model)
+
+with mujoco.viewer.launch_passive(model, data) as viewer:
+    while viewer.is_running():
+        step_start = time.time()
+        mujoco.mj_step(model, data)
+        viewer.sync()
+        
+        # Throttle loop to match physics step (~60 FPS) to prevent CPU overuse
+        time_until_next_step = model.opt.timestep - (time.time() - step_start)
+        if time_until_next_step > 0:
+            time.sleep(time_until_next_step)
 ```
 
-If `glxgears` and `rviz2` both open windows on your screen and
-`nvidia-smi` shows your GPU, you're good to go for the rest of the
-course.
+### Execution Steps
 
-### 5. Quick MuJoCo check (optional, humanoid model):
-```bash
-mkdir -p ~/mujoco_models && cd ~/mujoco_models
-curl -O https://raw.githubusercontent.com/google-deepmind/mujoco/main/model/humanoid/humanoid.xml
-python3 -m mujoco.viewer
+1. Download the humanoid model inside the container:
+   ```
+   mkdir -p ~/mujoco_models && cd ~/mujoco_models
+   curl -O https://raw.githubusercontent.com/google-deepmind/mujoco/main/model/humanoid/humanoid.xml
+   ```
+
+2. Run the script:
+   ```
+   cd /home/ros/ros2_ws
+   python3 test_view.py
+   ```
+
+3. View the rendered model in your browser at `http://localhost:8080/vnc.html`.
+
+---
+
+## 📂 Project Structure
+
 ```
-Drag `humanoid.xml` into the viewer window that pops up — you should see
-a humanoid ragdoll fall over under gravity. That confirms MuJoCo's GPU
-rendering path is working too.
-
-### 6. Stopping it:
-```bash
-docker compose down
+.
+├── Dockerfile          # Ubuntu 24.04 base + ROS 2 Jazzy + Gazebo + Mesa/noVNC
+├── docker-compose.yml  # Port mapping (8080), volume mounts, and environment flags
+├── entrypoint.sh       # Launches Xvfb, Openbox, x11vnc, websockify, and ROS sources
+└── ros2_ws/            # Local ROS 2 workspace mounted into /home/ros/ros2_ws
+    ├── test_view.py    # MuJoCo CPU-throttled view script
+    └── src/            # Put your ROS 2 packages here
 ```
 
-## Using the workspace
+---
 
-Anything you put in `./ros2_ws/src` on your machine appears at
-`/home/ros/ros2_ws/src` inside the container, and vice versa — so you can
-edit code with your normal editor/IDE on your machine and build/run it
-inside the container:
-```bash
-cd ~/ros2_ws
-colcon build
-source install/setup.bash
-```
-(You'll need to re-run that `source` line, or open a new shell, after
-each `colcon build` so the container picks up your newly built packages.)
+## ⚡ Useful Commands
 
-## Troubleshooting
+| Action | Command |
+| :--- | :--- |
+| **Start Environment** | `docker compose up -d` |
+| **Stop Environment** | `docker compose down` |
+| **Rebuild Container** | `docker compose build` |
+| **Open Container Bash** | `docker compose exec ros2 bash` |
+| **Kill Stuck Python/Sim Process** | `killall -9 python3` *(inside container)* |
 
-- **No GUI windows open at all**: did you run `xhost +local:docker` on
-  your machine (not inside the container) before starting the container?
-- **`nvidia-smi` fails inside the container**: check the NVIDIA Container
-  Toolkit prerequisite above — this is almost always the cause.
-- **Files you create in `ros2_ws` show up owned by the wrong user on your
-  machine**: check `id -u` and `id -g` on your machine and make sure
-  those numbers match `UID`/`GID` in your `.env` file (or regenerate it
-  with step 0 above), then rebuild with `docker compose up -d --build`.
-- **`xhost +local:docker` feels too permissive**: use
-  `xhost +si:localuser:$(whoami)` instead — it only trusts your own user
-  account rather than all local containers.
+---
+
+## ⚙️ Architecture Notes (CPU vs. GPU)
+
+* **Base Image:** `ubuntu:24.04` (Noble) running natively on `x86_64`.
+* **Graphics Pipeline:** Software rendering powered by Mesa (`llvmpipe`), outputting OpenGL 4.5 through Xvfb virtual framebuffers.
+* **Display Server:** `websockify` bridging `x11vnc` to `noVNC` on port `8080`.
